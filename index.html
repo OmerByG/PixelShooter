@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proton Pixel Shooter</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+            background: #8be1fc;
+        }
+        #scoreboard, #healthboard {
+            position: fixed;
+            top: 20px;
+            font-size: 24px;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+        #scoreboard {
+            left: 20px;
+        }
+        #healthboard {
+            right: 20px;
+        }
+        .controls {
+            position: fixed;
+            bottom: 30px;
+            display: flex;
+            gap: 20px;
+        }
+        .btn {
+            width: 60px;
+            height: 60px;
+            background: #555;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            font-size: 24px;
+            text-align: center;
+            line-height: 60px;
+            cursor: pointer;
+            user-select: none;
+        }
+        .btn:active {
+            background: #333;
+        }
+        #left {
+            position: fixed;
+            left: 10px;
+            bottom: 30px;
+        }
+        #right {
+            position: fixed;
+            right: 10px;
+            bottom: 30px;
+        }
+        @media (max-width: 768px) {
+            .controls {
+                display: flex;
+            }
+        }
+        @media (min-width: 769px) {
+            .controls {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="scoreboard">Score: 0</div>
+    <div id="healthboard">Health: 3</div>
+    <canvas id="gameCanvas"></canvas>
+
+    <div class="controls">
+        <button class="btn" id="left">←</button>
+        <button class="btn" id="right">→</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        // Cihaz türüne göre hız belirleme
+        const isMobile = window.innerWidth <= 768;
+        const playerSpeed = isMobile ? 5 : 10; // Mobil cihazlar için hız 5, masaüstü için 10
+
+        let player = {
+            x: canvas.width / 2,
+            y: canvas.height - 100,
+            size: 50,
+            speed: playerSpeed,
+            health: 3,
+            color: '#00f'
+        };
+
+        let bullets = [];
+        let enemies = [];
+        let score = 0;
+        let keys = {};
+        let difficulty = 1;
+
+        window.addEventListener('keydown', (e) => {
+            keys[e.key] = true;
+            if (e.key === ' ') {
+                shoot();
+            }
+        });
+
+        window.addEventListener('keyup', (e) => keys[e.key] = false);
+        window.addEventListener('click', shoot);  // Mouse tıklaması ile mermi atma
+
+        function shoot() {
+            bullets.push({
+                x: player.x + player.size / 2 - 5,
+                y: player.y,
+                width: 10,
+                height: 20,
+                color: '#fff',
+                speed: 8
+            });
+        }
+
+        function spawnEnemy() {
+            const size = 50;
+            let x = Math.random() * (canvas.width - size);
+            let y = -size;
+
+            let speed = 1 + Math.random() * (0.5 + difficulty); 
+            if (Math.random() < 0.2) {
+                speed += 1;
+            }
+            let health = Math.random() > 0.5 ? 1 : 2;
+
+            let enemy = {
+                x: x,
+                y: y,
+                size: size,
+                speed: speed,
+                health: health,
+                color: '#f00'
+            };
+            enemies.push(enemy);
+        }
+
+        setInterval(spawnEnemy, 2000);
+
+        function update() {
+            if (keys['a'] || keys['ArrowLeft']) player.x -= player.speed;
+            if (keys['d'] || keys['ArrowRight']) player.x += player.speed;
+
+            if (player.x < 0) player.x = 0;
+            if (player.x + player.size > canvas.width) player.x = canvas.width - player.size;
+
+            bullets.forEach((bullet, index) => {
+                bullet.y -= bullet.speed;
+                if (bullet.y < 0) bullets.splice(index, 1);
+            });
+
+            enemies.forEach((enemy, index) => {
+                enemy.y += enemy.speed;
+
+                if (enemy.y > canvas.height) {
+                    enemies.splice(index, 1);
+                    player.health -= 1;
+                    if (player.health <= 0) {
+                        alert('Game Over! Score: ' + score);
+                        window.location.reload();
+                    }
+                }
+
+                bullets.forEach((bullet, bIndex) => {
+                    if (
+                        bullet.x < enemy.x + enemy.size &&
+                        bullet.x + bullet.width > enemy.x &&
+                        bullet.y < enemy.y + enemy.size &&
+                        bullet.y + bullet.height > enemy.y
+                    ) {
+                        bullets.splice(bIndex, 1);
+                        enemy.health -= 1;
+                        if (enemy.health <= 0) {
+                            enemies.splice(index, 1);
+                            score += 10;
+                            document.getElementById('scoreboard').innerText = 'Score: ' + score;
+                        }
+                    }
+                });
+            });
+
+            if (score % 10 === 0 && score > 0) {
+                difficulty += 0.005;
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.fillStyle = player.color;
+            ctx.fillRect(player.x, player.y, player.size, player.size);
+            
+            bullets.forEach(bullet => {
+                ctx.fillStyle = bullet.color;
+                ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+            });
+
+            enemies.forEach(enemy => {
+                ctx.fillStyle = enemy.color;
+                ctx.fillRect(enemy.x, enemy.y, enemy.size, enemy.size);
+            });
+        }
+
+        const leftBtn = document.getElementById('left');
+        const rightBtn = document.getElementById('right');
+
+        leftBtn.addEventListener('touchstart', () => keys['ArrowLeft'] = true);
+        leftBtn.addEventListener('touchend', () => keys['ArrowLeft'] = false);
+        
+        rightBtn.addEventListener('touchstart', () => keys['ArrowRight'] = true);
+        rightBtn.addEventListener('touchend', () => keys['ArrowRight'] = false);
+
+        function gameLoop() {
+            update();
+            draw();
+            document.getElementById('healthboard').innerText = 'Health: ' + player.health;
+            requestAnimationFrame(gameLoop);
+        }
+
+        gameLoop();
+
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+    </script>
+</body>
+</html>
